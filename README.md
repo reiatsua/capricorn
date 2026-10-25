@@ -53,5 +53,6 @@ python main.py
 ```env
 GEMINI_API_KEY=твой_ключ_от_Google_AI_Studio
 GEMINI_MODEL=gemini-2.5-flash
+(Примечание: 2.5-flash имеет мало лимиотов. Если не хотите платить, но хотите больше общения, то используйте GEMINI_MODEL=gemini-flash-lite-latest. Учтите что эта модель 'тупее' обычного flash)
 ```
 Бесплатный ключ можно взять на [Google AI Studio](https://aistudio.google.com/app/apikey).
