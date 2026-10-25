@@ -29,6 +29,13 @@
 
 ---
 
+## Установка зависимостей:
+
+Перед первым запуском установите необходимые библиотеки из `requirements.txt`:
+
+```powershell
+pip install -r requirements.txt
+
 ## Запуск:
 
 В терминале VS Code:
