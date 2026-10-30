@@ -111,7 +111,7 @@ def run_app():
 
     # Initial greeting in terminal
     time.sleep(0.3)
-    ui.print_capri("Системы онлайн, чоом. Сеть шумит, экран под присмотром. Звездочка на рабочем столе.", source="ONLINE")
+    ui.print_capri("Системы онлайн, чумба. Спотифай на прицеле, дек подключен к системе, файлы под присмотром (read-only).", source="ONLINE")
 
     # Connect widget close event to clean shutdown
     def on_shutdown():

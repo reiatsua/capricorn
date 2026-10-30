@@ -15,3 +15,9 @@ ENV/
 
 .vscode/
 .idea/
+
+plugins/*
+!plugins/.gitkeep
+
+spotify_captured.png
+@AutomationLog.txt

@@ -2,10 +2,13 @@ import io
 import json
 import base64
 import random
+import re
 from typing import List, Dict, Any, Optional
 from PIL import Image
 
 import config
+import system_controller
+from skill_manager import skill_manager
 from terminal_ui import ui
 
 class CapriBrain:
@@ -13,9 +16,18 @@ class CapriBrain:
     def __init__(self):
         self.history: List[Dict[str, str]] = []
         self.client_gemini = None
+        self.chat = None
+        self.chat_model = None
         self.provider = "mock"
 
+        # Listen for dynamic skill updates from Capri self-modifications
+        skill_manager.register_on_tools_updated(self._on_tools_updated)
         self._init_provider()
+
+    def _on_tools_updated(self):
+        """Called when Capri writes and activates a new tool."""
+        self.chat = None  # Recreate chat with new toolset on next message
+        ui.print_system("Мозги Капри обновлены: новый инструмент подключен в чат-сессию.")
 
     def _init_provider(self):
         self.active_model = config.GEMINI_MODEL
@@ -46,33 +58,33 @@ class CapriBrain:
     def clear_memory(self):
         """Clears conversational history."""
         self.history.clear()
+        self.chat = None
+        self.chat_model = None
 
     def respond_to_text(self, user_text: str) -> str:
-        """Generate response to user text/voice input."""
-        # 1. Провайдер джемки
+        """Generate response to user text/voice input with function calling capability."""
+        # 1. Gemini Provider with Tools
         if self.client_gemini is not None:
             try:
                 from google.genai import types
 
-                contents = []
-                for turn in self.history[-config.MAX_HISTORY_TURNS:]:
-                    role = "user" if turn["role"] == "user" else "model"
-                    contents.append(types.Content(role=role, parts=[types.Part.from_text(text=turn["content"])]))
-
-                # Add current user prompt
-                contents.append(types.Content(role="user", parts=[types.Part.from_text(text=user_text)]))
-
                 for model_name in self._get_gemini_candidates():
                     try:
-                        response = self.client_gemini.models.generate_content(
-                            model=model_name,
-                            contents=contents,
-                            config=types.GenerateContentConfig(
-                                system_instruction=config.CAPRI_SYSTEM_PROMPT,
-                                temperature=0.85,
+                        # Create or reuse chat session with all system and custom tools
+                        if self.chat is None or self.chat_model != model_name:
+                            self.chat = self.client_gemini.chats.create(
+                                model=model_name,
+                                config=types.GenerateContentConfig(
+                                    system_instruction=config.CAPRI_SYSTEM_PROMPT,
+                                    temperature=0.85,
+                                    tools=skill_manager.get_all_tools()
+                                )
                             )
-                        )
-                        reply = response.text.strip()
+                            self.chat_model = model_name
+
+                        response = self.chat.send_message(user_text)
+                        reply = response.text.strip() if response.text else "Сделано, чумба."
+
                         if model_name != self.active_model:
                             self.active_model = model_name
                             ui.print_system(f"Переключилась на активную модель: {model_name}")
@@ -84,6 +96,7 @@ class CapriBrain:
 
                     except Exception as e:
                         err_str = str(e)
+                        self.chat = None # reset chat on error
                         if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
                             ui.print_status("ERROR", f"Квота {model_name} исчерпана (429). Пробую следующую модель...")
                             continue
@@ -227,7 +240,47 @@ class CapriBrain:
         return self._mock_screen_reply()
 
     def _mock_text_reply(self, user_text: str) -> str:
-        """Sample authentic replies when offline/mock."""
+        """Fallback replies when offline/mock with basic local tool handling."""
+        lower = user_text.lower()
+        
+        # 1. Spotify / Media intents
+        if any(w in lower for w in ["спотифай", "спотик", "spotify", "музык", "трек", "песн", "синтвейв", "саундтрек", "плейлист"]):
+            if "пауз" in lower or "стоп" in lower:
+                system_controller.control_playback("play_pause")
+                return "Поставила спотик на паузу, чумба."
+            elif "след" in lower or "скип" in lower or "дальш" in lower:
+                system_controller.control_playback("next")
+                return "Скипнула на следующий трек, лови новый ритм."
+            elif "назад" in lower or "предыд" in lower:
+                system_controller.control_playback("prev")
+                return "Вернула предыдущий трек."
+            else:
+                # Extract query if possible
+                query = re.sub(r"(включи|вруби|найди|запусти|поставь|песню|трек|музыку|в спотике|в спотифае|spotify)", "", lower).strip()
+                res = system_controller.play_spotify(query)
+                return f"Врубила спотик, чумба! {res}"
+
+        if "громче" in lower or "прибавь" in lower:
+            system_controller.control_playback("volume_up")
+            return "Прибавила звук, качаем на полную!"
+
+        if "тише" in lower or "убавь" in lower:
+            system_controller.control_playback("volume_down")
+            return "Сделала потише, чумба."
+
+        # 2. Open App intents
+        if any(lower.startswith(w) for w in ["открой ", "запусти ", "включи "]):
+            app_target = re.sub(r"^(открой|запусти|включи)\s+", "", lower).strip()
+            if app_target:
+                res = system_controller.open_app(app_target)
+                return f"Разворачиваю {app_target}, чумба. {res}"
+
+        # 3. Files intents (Read-Only)
+        if any(w in lower for w in ["покажи файлы", "список файлов", "что на рабочем столе", "файлы на рабочем"]):
+            res = system_controller.list_directory()
+            return f"Вот что нарыла на рабочем столе:\n{res}"
+
+        # Default random conversational replies
         replies = [
             "В Сети сегодня тихо, чумба. Даже подозрительно тихо. Пора навести шороху.",
             "Принято, чумба. Твой дек пока не плавится — уже неплохой результат.",

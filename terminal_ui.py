@@ -59,11 +59,12 @@ class TerminalUI:
         with self._lock:
             banner = f"""
 {CYAN}╔══════════════════════════════════════════════════════════════════════╗
-║  {BRIGHT_YELLOW}CAPRI // PROJECT CAPRICORN [DESKTOP CONSTRUCT v0.1]{CYAN}                 ║
-║  {WHITE}Cyberpunk Desktop AI Assistant — Backend Daemon{CYAN}                     ║
+║  {BRIGHT_YELLOW}CAPRI // PROJECT CAPRICORN [DESKTOP CONSTRUCT v0.2]{CYAN}                 ║
+║  {WHITE}Cyberpunk Desktop AI Assistant — PC Control & Screen Eye{CYAN}        ║
 ╠══════════════════════════════════════════════════════════════════════╣
 ║  {GRAY}Status    :{RESET} {GREEN}ONLINE{CYAN}                                              ║
 ║  {GRAY}AI Brain  :{RESET} {WHITE}{provider:<20}{CYAN}                               ║
+║  {GRAY}Cyberware :{RESET} {GREEN}Spotify, App Launch, File Scout (Read-Only){CYAN}         ║
 ║  {GRAY}Screen Eye:{RESET} {YELLOW}ACTIVE{CYAN} (Every {min_interval}s - {max_interval}s random){CYAN}                 ║
 ║  {GRAY}Voice Mic :{RESET} {MAGENTA}HOTKEY [{hotkey}]{CYAN} (Press to speak / press again to send)       ║
 ║  {GRAY}Commands  :{RESET} {GRAY}/watch (force see), /status, /clear, /exit{CYAN}             ║
