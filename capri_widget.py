@@ -23,6 +23,8 @@ class CapriFloatingStar(QWidget):
     request_voice_toggle = pyqtSignal()
     user_sent_message = pyqtSignal(str)
     closed = pyqtSignal()
+    dialogue_opened = pyqtSignal()
+    dialogue_closed = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -79,6 +81,8 @@ class CapriFloatingStar(QWidget):
 
     def on_screen_analyzed(self, comment: str):
         """Called when Screen Watcher finishes analyzing screen."""
+        if self.dialogue_box.isVisible():
+            return
         self.set_state("WATCHING")
         self._open_dialogue()
         self.dialogue_box.set_capri_speaking(comment, source="WATCHING")
@@ -104,6 +108,7 @@ class CapriFloatingStar(QWidget):
 
     def _open_dialogue(self):
         """Positions and displays the dialogue box next to the star."""
+        was_visible = self.dialogue_box.isVisible()
         screen = QGuiApplication.primaryScreen()
         if not screen:
             return
@@ -126,10 +131,14 @@ class CapriFloatingStar(QWidget):
             target_y = screen_geom.top() + 20
 
         self.dialogue_box.show_animated(QPoint(int(target_x), int(target_y)))
+        if not was_visible:
+            self.dialogue_opened.emit()
         # Pause drifting while dialogue is open
         self.is_drifting = False
 
     def _on_dialogue_closed(self):
+        if not self.dialogue_box.isVisible():
+            self.dialogue_closed.emit()
         self.is_drifting = True
         self.set_state("DORMANT")
 

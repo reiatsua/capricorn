@@ -29,7 +29,7 @@ class CyberpunkDialogueBox(QWidget):
             Qt.WindowType.SubWindow
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setFixedSize(440, 380)
+        self.setFixedSize(440, 440)
 
         # Speech typewriter animation timer
         self._typewriter_timer = QTimer(self)

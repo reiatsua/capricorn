@@ -83,6 +83,9 @@ class ScreenWatcher(threading.Thread):
         self.on_screen_analyzed = on_screen_analyzed
         self._stop_event = threading.Event()
         self._manual_trigger = threading.Event()
+        self._dialogue_open = threading.Event()
+        self._resume_after = 0.0
+        self._pause_lock = threading.Lock()
         self.next_interval = random.randint(config.MIN_WATCH_INTERVAL, config.MAX_WATCH_INTERVAL)
         self._last_thumb = None
 
@@ -102,7 +105,24 @@ class ScreenWatcher(threading.Thread):
 
     def trigger_now(self):
         """Immediately trigger a screen capture and analysis."""
+        if self.is_paused():
+            ui.print_system("Проверка экрана отложена: диалог открыт или действует минутная пауза.")
+            return
         self._manual_trigger.set()
+
+    def set_dialogue_open(self, is_open: bool):
+        """Pause screen watching while the dialogue is open and for 60s after it closes."""
+        with self._pause_lock:
+            if is_open:
+                self._dialogue_open.set()
+            else:
+                self._dialogue_open.clear()
+                self._resume_after = time.monotonic() + 60
+                self._manual_trigger.clear()
+
+    def is_paused(self) -> bool:
+        with self._pause_lock:
+            return self._dialogue_open.is_set() or time.monotonic() < self._resume_after
 
     def stop(self):
         self._stop_event.set()
@@ -112,10 +132,16 @@ class ScreenWatcher(threading.Thread):
         time_elapsed = 0
 
         while not self._stop_event.is_set():
+            if self.is_paused():
+                self._manual_trigger.clear()
+                time.sleep(0.25)
+                continue
+
             # Check every 0.5s for stop or manual trigger
             if self._manual_trigger.is_set():
                 self._manual_trigger.clear()
-                self._do_screen_check(is_manual=True)
+                if not self.is_paused():
+                    self._do_screen_check(is_manual=True)
                 time_elapsed = 0
                 self.next_interval = random.randint(config.MIN_WATCH_INTERVAL, config.MAX_WATCH_INTERVAL)
                 continue
@@ -126,16 +152,19 @@ class ScreenWatcher(threading.Thread):
             if time_elapsed >= self.next_interval:
                 time_elapsed = 0
                 self.next_interval = random.randint(config.MIN_WATCH_INTERVAL, config.MAX_WATCH_INTERVAL)
-                self._do_screen_check(is_manual=False)
+                if not self.is_paused():
+                    self._do_screen_check(is_manual=False)
 
     def _do_screen_check(self, is_manual: bool = False):
+        if self.is_paused():
+            return
         ui.print_status("WATCHING", "Capturing screen...")
         screenshot = capture_desktop()
-        if screenshot is not None:
+        if screenshot is not None and not self.is_paused():
             if not is_manual and not self._is_screen_changed(screenshot):
                 ui.print_system("Экран без изменений — пропускаю анализ для экономии квоты.")
             else:
                 self.on_screen_analyzed(screenshot)
-        else:
+        elif screenshot is None and not self.is_paused():
             ui.print_status("ERROR", "Could not capture desktop screen.")
         ui.print_system(f"Next screen check scheduled in {self.next_interval}s.")

@@ -4,10 +4,11 @@ Draws the cyberpunk 8-pointed star and avatar using QPainter.
 """
 
 import math
+from pathlib import Path
 from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPainterPath,
-    QRadialGradient, QLinearGradient, QFont
+    QRadialGradient, QLinearGradient, QFont, QMovie
 )
 from PyQt6.QtWidgets import QWidget
 
@@ -140,80 +141,54 @@ class CapriStarDrawer:
 
 
 class CapriAvatarWidget(QWidget):
-    """Renders the authentic stylized construct face from the video."""
+    """Shows Capri's supplied GIF artwork in the dialogue."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(160, 95)
+        self.setFixedSize(150, 190)
         self.is_talking = False
         self.mouth_offset = 0.0
 
+        project_dir = Path(__file__).resolve().parent
+        self.idle_movie = QMovie(str(project_dir / "capri-cyberpunk.gif"))
+        self.talking_movie = QMovie(str(project_dir / "cyberpunk-capri-cyberpunk.gif"))
+        for movie in (self.idle_movie, self.talking_movie):
+            movie.frameChanged.connect(lambda _frame: self.update())
+            if movie.isValid():
+                movie.jumpToFrame(0)
+
     def set_talking(self, talking: bool):
+        if self.is_talking == talking:
+            return
         self.is_talking = talking
+        if talking and self.talking_movie.isValid():
+            self.idle_movie.stop()
+            self.talking_movie.jumpToFrame(0)
+            self.talking_movie.start()
+        else:
+            self.talking_movie.stop()
+            if self.idle_movie.isValid():
+                self.idle_movie.jumpToFrame(0)
         self.update()
 
     def paintEvent(self, event):
         p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        w, h = self.width(), self.height()
+        p.fillRect(self.rect(), QColor(7, 8, 16))
+        movie = self.talking_movie if self.is_talking and self.talking_movie.isValid() else self.idle_movie
+        frame = movie.currentPixmap()
+        if frame.isNull():
+            return
 
-        # 1. Cyberpunk Red Background
-        p.fillRect(0, 0, w, h, QColor(220, 20, 60))
-
-        # 2. Geometric jagged black silhouette (Hair / Collar / Helmet)
-        p.setBrush(QBrush(QColor(15, 17, 24)))
-        p.setPen(Qt.PenStyle.NoPen)
-
-        # Back shadow
-        path_shadow = QPainterPath()
-        path_shadow.moveTo(0, 0)
-        path_shadow.lineTo(w * 0.45, 0)
-        path_shadow.lineTo(w * 0.25, h)
-        path_shadow.lineTo(0, h)
-        path_shadow.closeSubpath()
-        p.drawPath(path_shadow)
-
-        # Head / Hair angular silhouette
-        head_path = QPainterPath()
-        head_path.moveTo(w * 0.35, 10)
-        head_path.lineTo(w * 0.85, 20)
-        head_path.lineTo(w * 0.95, h * 0.65)
-        head_path.lineTo(w * 0.75, h - 5)
-        head_path.lineTo(w * 0.45, h - 10)
-        head_path.lineTo(w * 0.30, h * 0.55)
-        head_path.closeSubpath()
-        p.drawPath(head_path)
-
-        # 3. Neon Green Visor / Cybernetic Eye Mask
-        visor_color = QColor(0, 255, 170)
-        p.setBrush(QBrush(visor_color))
-        p.setPen(QPen(QColor(255, 255, 255), 1.2))
-
-        visor = QPainterPath()
-        vx, vy = w * 0.52, h * 0.42
-        visor.moveTo(vx, vy)
-        visor.lineTo(vx + 32, vy - 6)
-        visor.lineTo(vx + 38, vy + 14)
-        visor.lineTo(vx + 10, vy + 18)
-        visor.closeSubpath()
-        p.drawPath(visor)
-
-        # Inner dark pupil in visor
-        p.setBrush(QBrush(QColor(15, 17, 24)))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.drawEllipse(QPointF(vx + 20, vy + 5), 4.0, 4.0)
-
-        # 4. Animated Mouth / Jaw Line (glitches when talking)
-        mouth_y = h * 0.75 + (self.mouth_offset if self.is_talking else 0)
-        p.setPen(QPen(visor_color, 2.0))
-        p.drawLine(int(w * 0.55), int(mouth_y), int(w * 0.70), int(mouth_y + 3))
-
-        # 5. Scanlines effect overlay
-        p.setPen(QPen(QColor(0, 0, 0, 40), 1.0))
-        for y in range(0, h, 3):
-            p.drawLine(0, y, w, y)
-
-        # 6. Yellow/Cyan frame border
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.setPen(QPen(QColor(254, 235, 0), 2.0))
-        p.drawRect(1, 1, w - 2, h - 2)
+        scaled = frame.scaled(
+            self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        x = (self.width() - scaled.width()) // 2
+        y = (self.height() - scaled.height()) // 2
+        if self.is_talking:
+            p.drawPixmap(x + int(self.mouth_offset * 0.35), y, scaled)
+            p.setPen(QPen(QColor(0, 240, 255, 110), 1))
+            for scan_y in range(3, self.height(), 5):
+                p.drawLine(0, scan_y, self.width(), scan_y)
+        else:
+            p.drawPixmap(x, y, scaled)

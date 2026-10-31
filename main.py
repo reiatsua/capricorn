@@ -67,8 +67,14 @@ def run_app():
 
     # Handlers for background workers
     def on_screen_analyzed(img):
+        if screen_watcher.is_paused():
+            return
         ui.print_status("WATCHING", "Analyzing captured screen...")
         comment = brain.analyze_screen(img)
+        # The dialogue may have opened while the AI was analyzing the captured image.
+        if screen_watcher.is_paused():
+            ui.print_system("Описание экрана отменено: диалог открыт или действует минутная пауза.")
+            return
         ui.print_capri(comment, source="WATCHING")
         bridge.sig_screen_analyzed.emit(comment)
 
@@ -103,6 +109,8 @@ def run_app():
     screen_watcher = ScreenWatcher(on_screen_analyzed=on_screen_analyzed)
     voice_listener = VoiceListener(on_voice_recognized=on_voice_recognized, on_voice_started=on_voice_started)
 
+    star.dialogue_opened.connect(lambda: screen_watcher.set_dialogue_open(True))
+    star.dialogue_closed.connect(lambda: screen_watcher.set_dialogue_open(False))
     star.request_screen_check.connect(screen_watcher.trigger_now)
     star.request_voice_toggle.connect(voice_listener.toggle_recording)
 

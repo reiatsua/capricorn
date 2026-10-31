@@ -18,6 +18,9 @@ ENV/
 
 plugins/*
 !plugins/.gitkeep
+!plugins/minecraft_chat.py
+!plugins/custom_minecraft_chat.py
+!plugins/minecraft_connector.py
 
 spotify_captured.png
-@AutomationLog.txt
+@AutomationLog.txt  
